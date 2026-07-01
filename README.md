@@ -30,7 +30,9 @@ the herdr logo. No Homebrew `terminal-notifier` needed at runtime.
 
 The app bundle is committed so normal plugin installs stay self-contained. The
 source and Tuist project are included so reviewers and users can rebuild that
-bundle locally.
+bundle locally. At install/runtime, the bundle is staged into
+`~/Applications/HerdrNotify.app` by default so Launch Services sees a stable app
+path instead of a moving repo checkout.
 
 ## Requirements
 
@@ -47,7 +49,7 @@ bundle locally.
 notifications per app, and this can't be scripted. After installing:
 
 1. Trigger one notification (e.g. let an agent go blocked), or run
-   `assets/HerdrNotify.app/Contents/MacOS/terminal-notifier -title hi -message x`.
+   `open -g -n -a ~/Applications/HerdrNotify.app --args -title hi -message x`.
 2. Open **System Settings → Notifications → herdr** and turn **Allow Notifications** on
    (set the style to Alerts/Banners as you like).
 
@@ -70,14 +72,20 @@ scripts/install.sh            # install from GitHub
 scripts/install.sh --link     # link this checkout + register the notifier app
 ```
 
-Install registers `HerdrNotify.app` with Launch Services (re-sign + `lsregister`).
-On `herdr plugin install` this happens via the manifest `[[build]]` step; on
-`link` the handler also self-registers on first event.
+Install stages `HerdrNotify.app` into `~/Applications/HerdrNotify.app` by
+default, re-signs it, and registers that staged copy with Launch Services.
+`scripts/install.sh` always re-runs that convergence step, even if the plugin is
+already installed, so a stale or missing staged app gets repaired immediately.
+
+On `herdr plugin install` the manifest `[[build]]` step also runs
+`scripts/setup-notifier.sh`. If staging or Launch Services registration fails,
+that script now exits non-zero and prints diagnostics including the source app,
+target app, bundle id, and `codesign` verification output.
 
 An ad-hoc-signed helper can quietly lose that registration over time (reboots,
 OS updates), and macOS then falls back to showing the **parent terminal's** icon
 instead of the herdr logo. To recover without manual intervention, the handler
-re-registers the bundle whenever its registration is older than
+re-registers the staged bundle whenever its registration is older than
 `REGISTER_TTL_SECONDS` (default 6h) — so the icon self-heals within that window
 the next time a notification fires. No cron, daemon, or `chezmoi apply` needed.
 
@@ -119,6 +127,8 @@ Key settings:
 | `ACTIVATE_ON_CLICK` | `1` | click notification → focus the agent |
 | `CLICK_COMMAND` | `agent focus {pane}` | `herdr` subcommand run on click |
 | `NOTIFIER` | _(bundled app)_ | absolute path to override the notifier binary |
+| `HERDR_NOTIFY_APP_PATH` | `~/Applications/HerdrNotify.app` | override the staged bundled app path |
+| `HERDR_NOTIFY_INSTALL_DIR` | `~/Applications` | override the parent dir for the staged bundled app |
 | `REGISTER_TTL_SECONDS` | `21600` | refresh Launch Services registration when older (self-heals left icon) |
 | `ICON_MODE` | `contentImage` | right-side image mode (`contentImage`; `appIcon` is passed only to custom `NOTIFIER` overrides that support it) |
 | `TITLE_<STATUS>` / `BODY_<STATUS>` | see example | message templates |
@@ -129,7 +139,9 @@ Template placeholders: `{agent}` `{workspace}` `{worktree}` `{tab}` `{pane}`
 status (`BLOCKED`, `DONE`, …); `*_DEFAULT` covers the rest.
 
 With the registered bundled app, the **left** icon is the herdr logo. `ICON_*`
-controls the optional **right-side** status image.
+controls the optional **right-side** status image. The bundled helper is launched
+through its staged app bundle so macOS sees a normal app launch instead of a
+raw executable path.
 
 ## Customizing the herdr icon
 
@@ -139,7 +151,7 @@ The icon source lives in `assets/` (`herdr-logo.svg` → rounded `herdr-rounded.
 ```sh
 # render any 1024×1024 PNG, then:
 sips -s format icns your.png --out assets/HerdrNotify.app/Contents/Resources/Terminal.icns
-bash scripts/setup-notifier.sh        # re-sign + re-register
+bash scripts/setup-notifier.sh        # restage + re-sign + re-register
 ```
 
 ## Building the notifier app
@@ -150,14 +162,19 @@ defined with Tuist in `Project.swift`. Rebuilding requires Tuist and Xcode with
 
 ```sh
 brew install tuist
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
 scripts/build-notifier.sh
 scripts/install.sh --link
 ```
 
+`xcode-select -s` must point at the Xcode Developer directory, not just the app
+bundle. If you use a different app name such as `Xcode-beta.app`, adjust the
+path accordingly.
+
 The script runs `tuist generate`, builds the Release `HerdrNotify` app, copies it
-to `assets/HerdrNotify.app`, and ad-hoc signs it. `scripts/install.sh --link`
-links the checkout into herdr and runs `scripts/setup-notifier.sh` to register the
-app with Launch Services.
+to `assets/HerdrNotify.app`, and ad-hoc signs it. It then runs
+`scripts/setup-notifier.sh` so the rebuilt helper is immediately restaged into
+its stable runtime path and re-registered with Launch Services.
 
 Rebuilding intentionally replaces the committed `assets/HerdrNotify.app` bundle
 and can leave a git diff if your local toolchain emits different build metadata.
@@ -180,8 +197,8 @@ accepts `-open` for compatibility, though the plugin does not currently pass it.
 - **Config source of truth in dotfiles** via `HERDR_TN_CONFIG` (never hand-edit
   herdr's per-machine config dir, which an apply would revert).
 - **Install convergence**: call `scripts/install.sh` from a chezmoi `run_onchange_*`
-  script or a nix-darwin `activationScript`; it installs/links only when absent and
-  registers the notifier app.
+  script or a nix-darwin `activationScript`; it installs/links when needed and always
+  restages and re-registers the notifier app.
 
 ## Notes & caveats
 

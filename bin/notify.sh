@@ -12,6 +12,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "$ROOT/lib/config.sh"
 # shellcheck source=lib/herdr.sh
 . "$ROOT/lib/herdr.sh"
+# shellcheck source=lib/notifier.sh
+. "$ROOT/lib/notifier.sh"
 
 STATE_DIR="${HERDR_PLUGIN_STATE_DIR:-${TMPDIR:-/tmp}/herdr-tn}"
 mkdir -p "$STATE_DIR"
@@ -32,52 +34,22 @@ shell_quote() {
 }
 
 # --- 0. resolve the notifier binary -----------------------------------------
-# Prefer the bundled HerdrNotify.app (custom herdr icon + own bundle id), then
-# an explicit override, then a system terminal-notifier. The bundled app is
-# what makes the notification's LEFT icon the herdr logo instead of a terminal.
-BUNDLED_APP="$ROOT/assets/HerdrNotify.app"
-BUNDLED_BIN="$BUNDLED_APP/Contents/MacOS/terminal-notifier"
+# Prefer the bundled HerdrNotify.app staged into a stable per-user app location
+# (custom herdr icon + own bundle id), then an explicit override, then a system
+# terminal-notifier. The stable install path avoids Launch Services drift tied
+# to a moving repo checkout path.
+BUNDLED_APP=""
 USING_BUNDLED=0
+NOTIFIER_MODE="binary"
 if [ -n "${NOTIFIER:-}" ] && [ -x "$NOTIFIER" ]; then
   NOTIFIER_BIN="$NOTIFIER"
-elif [ -x "$BUNDLED_BIN" ]; then
-  NOTIFIER_BIN="$BUNDLED_BIN"
+elif BUNDLED_APP="$(notifier_prepare_app "$STATE_DIR" 1)"; then
   USING_BUNDLED=1
-  # Keep the bundle registered with Launch Services so macOS attributes the
-  # notification (and its LEFT icon) to HerdrNotify.app instead of falling back
-  # to the parent terminal's icon (ghostty, Terminal, ...).
-  #
-  # An ad-hoc-signed, non-notarized helper can silently lose its LS registration
-  # over time (reboots, OS updates). When that happens the icon reverts to the
-  # terminal's. A plain "register once per app revision" sentinel never recovers
-  # from that — once stale, it stays stale — so we self-heal on a TTL:
-  #   * no sentinel / bundle newer than sentinel -> re-sign + register (new build)
-  #   * sentinel older than REGISTER_TTL_SECONDS  -> register only (cheap refresh)
-  # lsregister-only on the periodic path avoids re-signing (which would bump the
-  # binary mtime and spuriously trip the "bundle newer" branch every time).
-  sentinel="$STATE_DIR/.notifier-registered"
-  lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
-  register_ttl="${REGISTER_TTL_SECONDS:-21600}" # 6h; bounds how long a stale reg can linger
-  is_uint "$register_ttl" || register_ttl=21600
-  needs_register=0 needs_codesign=0
-  if [ ! -f "$sentinel" ] || [ "$BUNDLED_BIN" -nt "$sentinel" ]; then
-    needs_register=1 needs_codesign=1
-  else
-    sentinel_age=$(( $(date +%s) - $(stat -f %m "$sentinel" 2>/dev/null || echo 0) ))
-    [ "$sentinel_age" -ge "$register_ttl" ] && needs_register=1
-  fi
-  if [ "$needs_register" = 1 ]; then
-    [ "$needs_codesign" = 1 ] && { codesign --force --deep -s - "$BUNDLED_APP" >/dev/null 2>&1 || true; }
-    if [ -x "$lsregister" ] && "$lsregister" -f "$BUNDLED_APP" >/dev/null 2>&1; then
-      : >"$sentinel"
-    else
-      log "failed to register bundled notifier with Launch Services"
-    fi
-  fi
+  NOTIFIER_MODE="bundle"
 elif command -v terminal-notifier >/dev/null 2>&1; then
   NOTIFIER_BIN="terminal-notifier"
 else
-  log "no notifier found (bundled HerdrNotify.app missing and no terminal-notifier on PATH)"
+  log "no notifier found (bundled HerdrNotify.app unavailable and no terminal-notifier on PATH)"
   exit 0
 fi
 
@@ -226,4 +198,22 @@ if [ "${ACTIVATE_ON_CLICK:-0}" = "1" ] && [ -n "$pane_id" ]; then
   args+=(-execute "$(shell_quote "$bin") $click")
 fi
 
-"$NOTIFIER_BIN" "${args[@]}" >/dev/null 2>&1 || log "notifier failed"
+fire_notifier() {
+  if [ "$NOTIFIER_MODE" = "bundle" ]; then
+    open -g -n -a "$BUNDLED_APP" --args "${args[@]}" >/dev/null 2>&1
+    return $?
+  fi
+
+  "$NOTIFIER_BIN" "${args[@]}" >/dev/null 2>&1
+}
+
+if ! fire_notifier; then
+  if [ "$NOTIFIER_MODE" = "bundle" ] && command -v terminal-notifier >/dev/null 2>&1; then
+    log "bundled notifier launch failed; falling back to terminal-notifier on PATH"
+    NOTIFIER_BIN="terminal-notifier"
+    NOTIFIER_MODE="binary"
+    fire_notifier || log "notifier failed"
+  else
+    log "notifier failed"
+  fi
+fi

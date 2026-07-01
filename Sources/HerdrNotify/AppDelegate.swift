@@ -14,11 +14,15 @@ private struct NotificationRequest {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDelegate {
     private let center = NSUserNotificationCenter.default
+    private let debugEnabled = ProcessInfo.processInfo.environment["HERDR_NOTIFY_DEBUG"] == "1"
+    private var terminationWorkItem: DispatchWorkItem?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         center.delegate = self
+        debug("launched bundle=\(Bundle.main.bundleIdentifier ?? "<nil>") args=\(CommandLine.arguments)")
 
         if let launchedNotification = notification.userInfo?[NSApplication.launchUserNotificationUserInfoKey] as? NSUserNotification {
+            debug("handling activation for launched notification")
             handleActivation(launchedNotification)
             NSApp.terminate(nil)
             return
@@ -46,10 +50,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCent
     }
 
     func userNotificationCenter(_ center: NSUserNotificationCenter, shouldPresent notification: NSUserNotification) -> Bool {
-        true
+        debug("shouldPresent title=\(notification.title ?? "")")
+        return true
+    }
+
+    func userNotificationCenter(_ center: NSUserNotificationCenter, didDeliver notification: NSUserNotification) {
+        debug("didDeliver title=\(notification.title ?? "") deliveredCount=\(center.deliveredNotifications.count)")
+        scheduleTermination(after: 0.25)
     }
 
     func userNotificationCenter(_ center: NSUserNotificationCenter, didActivate notification: NSUserNotification) {
+        debug("didActivate type=\(notification.activationType.rawValue)")
         handleActivation(notification)
         NSApp.terminate(nil)
     }
@@ -59,6 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCent
             removeDeliveredNotifications(group: request.group)
         }
 
+        debug("deliver start deliveredCount=\(center.deliveredNotifications.count)")
         let notification = NSUserNotification()
         notification.title = request.title
         notification.subtitle = request.subtitle
@@ -79,7 +91,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCent
         notification.userInfo = userInfo
 
         center.deliver(notification)
-        NSApp.terminate(nil)
+        debug("deliver returned actualDeliveryDate=\(String(describing: notification.actualDeliveryDate)) presented=\(notification.isPresented) deliveredCount=\(center.deliveredNotifications.count)")
+        scheduleTermination(after: 2.0)
     }
 
     private func handleActivation(_ notification: NSUserNotification) {
@@ -111,6 +124,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCent
         task.executableURL = URL(fileURLWithPath: "/bin/sh")
         task.arguments = ["-c", command]
         try? task.run()
+    }
+
+    private func scheduleTermination(after delay: TimeInterval) {
+        terminationWorkItem?.cancel()
+        let workItem = DispatchWorkItem {
+            self.debug("terminating after delay=\(delay)")
+            NSApp.terminate(nil)
+        }
+        terminationWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay, execute: workItem)
+    }
+
+    private func debug(_ message: String) {
+        guard debugEnabled else { return }
+        fputs("[HerdrNotify] \(message)\n", stderr)
     }
 }
 

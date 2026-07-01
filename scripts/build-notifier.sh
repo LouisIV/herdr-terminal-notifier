@@ -19,6 +19,13 @@ if ! command -v tuist >/dev/null 2>&1; then
   exit 1
 fi
 
+if ! command -v xcodebuild >/dev/null 2>&1; then
+  echo "xcodebuild not found on PATH; install Xcode and select its Developer directory" >&2
+  echo "example: sudo xcode-select -s /Applications/Xcode.app/Contents/Developer" >&2
+  echo "if you use Xcode beta: sudo xcode-select -s /Applications/Xcode-beta.app/Contents/Developer" >&2
+  exit 1
+fi
+
 cd "$ROOT"
 tuist generate --no-open
 xcodebuild \
@@ -43,3 +50,6 @@ codesign --force --deep -s - "$APP_TMP" >/dev/null
 rm -rf "$APP_DST"
 mv "$APP_TMP" "$APP_DST"
 echo "built notifier: $APP_DST"
+
+staged_app="$(bash "$ROOT/scripts/setup-notifier.sh" --quiet --print-path)"
+echo "staged notifier: $staged_app"
