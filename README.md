@@ -143,6 +143,22 @@ controls the optional **right-side** status image. The bundled helper is launche
 through its staged app bundle so macOS sees a normal app launch instead of a
 raw executable path.
 
+### Click behavior and terminal activation
+
+By default, clicking a notification runs `herdr agent focus {pane}`. That updates
+herdr's focused pane, but it may not automatically bring your terminal app to the
+front. Fronting the window is terminal-specific.
+
+For iTerm2, the following `CLICK_COMMAND` is a better default because it both
+focuses the herdr pane and asks iTerm2 to activate and select its current window:
+
+```sh
+CLICK_COMMAND="agent focus {pane} && osascript -e 'tell application \"iTerm2\" to activate' -e 'tell application \"iTerm2\" to tell current window to select'"
+```
+
+This is based on iTerm2's AppleScript support, where `select` on a window brings
+that window to the front.
+
 ## Customizing the herdr icon
 
 The icon source lives in `assets/` (`herdr-logo.svg` → rounded `herdr-rounded.svg`
