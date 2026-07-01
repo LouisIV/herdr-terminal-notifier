@@ -30,7 +30,12 @@ case "$mode" in
     ;;
 esac
 
-if [ "$mode" = "--install" ] && "$HERDR" plugin list 2>/dev/null | grep -Fq "$PLUGIN_ID"; then
+plugin_list="$("$HERDR" plugin list 2>/dev/null || true)"
+plugin_installed() {
+  printf '%s\n' "$plugin_list" | grep -Fq -- "- $PLUGIN_ID "
+}
+
+if [ "$mode" = "--install" ] && plugin_installed; then
   echo "$PLUGIN_ID already installed; nothing to do"
   exit 0
 fi
@@ -38,8 +43,12 @@ fi
 case "$mode" in
   --link)
     path="${2:-$ROOT}"
-    echo "linking $PLUGIN_ID from $path"
-    "$HERDR" plugin link "$path"
+    if plugin_installed && printf '%s\n' "$plugin_list" | grep -Fq -- "- $PLUGIN_ID " && printf '%s\n' "$plugin_list" | grep -Fq -- "[local:$path]"; then
+      echo "$PLUGIN_ID already linked from $path"
+    else
+      echo "linking $PLUGIN_ID from $path"
+      "$HERDR" plugin link "$path"
+    fi
     # link skips [[build]], so register the bundled notifier ourselves
     bash "$ROOT/scripts/setup-notifier.sh" || true
     ;;

@@ -10,7 +10,6 @@ private struct NotificationRequest {
     var execute = ""
     var open = ""
     var contentImage = ""
-    var appIcon = ""
 }
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCenterDelegate {
@@ -57,7 +56,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCent
 
     private func deliver(_ request: NotificationRequest) {
         if !request.group.isEmpty {
-            removeDeliveredNotification(group: request.group)
+            removeDeliveredNotifications(group: request.group)
         }
 
         let notification = NSUserNotification()
@@ -69,7 +68,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCent
             notification.soundName = request.sound == "default" ? NSUserNotificationDefaultSoundName : request.sound
         }
 
-        if let image = image(at: request.contentImage.isEmpty ? request.appIcon : request.contentImage) {
+        if let image = image(at: request.contentImage) {
             notification.contentImage = image
         }
 
@@ -96,14 +95,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSUserNotificationCent
            let url = URL(string: rawURL),
            !rawURL.isEmpty {
             NSWorkspace.shared.open(url)
-        }
-    }
-
-    private func removeDeliveredNotification(group: String) {
-        for notification in center.deliveredNotifications {
-            if notification.userInfo?["group"] as? String == group {
-                center.removeDeliveredNotification(notification)
-            }
         }
     }
 
@@ -171,12 +162,10 @@ private func parseArguments(_ arguments: [String]) throws -> NotificationRequest
         case "-contentImage":
             request.contentImage = try value(after: argument)
         case "-appIcon":
-            request.appIcon = try value(after: argument)
+            _ = try value(after: argument)
         case "-remove":
             let group = try value(after: argument)
-            NSUserNotificationCenter.default.deliveredNotifications
-                .filter { $0.userInfo?["group"] as? String == group }
-                .forEach { NSUserNotificationCenter.default.removeDeliveredNotification($0) }
+            removeDeliveredNotifications(group: group)
             NSApp.terminate(nil)
         case "-ignoreDnD":
             index += 1
@@ -192,6 +181,18 @@ private func parseArguments(_ arguments: [String]) throws -> NotificationRequest
     return request
 }
 
+func removeDeliveredNotifications(group: String) {
+    let center = NSUserNotificationCenter.default
+    if group == "ALL" {
+        center.removeAllDeliveredNotifications()
+        return
+    }
+
+    center.deliveredNotifications
+        .filter { $0.userInfo?["group"] as? String == group }
+        .forEach { center.removeDeliveredNotification($0) }
+}
+
 func printHelp() {
     print("""
     Usage: terminal-notifier -message VALUE [options]
@@ -205,11 +206,9 @@ func printHelp() {
       -sound NAME
       -group ID
       -contentImage PATH_OR_URL
-      -appIcon PATH_OR_URL
       -execute COMMAND
       -open URL
-      -remove ID
-      -ignoreDnD
+      -remove ID|ALL
       -help
       -version
     """)

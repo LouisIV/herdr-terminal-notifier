@@ -15,7 +15,9 @@ LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchS
 
 [ -d "$APP" ] || { echo "bundled notifier missing: $APP" >&2; exit 0; }
 
-codesign --force --deep -s - "$APP" >/dev/null 2>&1 || true
+if ! codesign --force --deep -s - "$APP" >/dev/null 2>&1; then
+  echo "warning: failed to ad-hoc sign notifier: $APP" >&2
+fi
 if [ -x "$LSREGISTER" ] && "$LSREGISTER" -f "$APP" >/dev/null 2>&1; then
   echo "registered notifier: $APP"
 else

@@ -11,6 +11,16 @@ if arguments.contains("-version") || arguments.contains("--version") {
     exit(0)
 }
 
+if let removeIndex = arguments.firstIndex(of: "-remove") {
+    let valueIndex = arguments.index(after: removeIndex)
+    guard valueIndex < arguments.endIndex else {
+        fputs("missing value for -remove\n", stderr)
+        exit(1)
+    }
+    removeDeliveredNotifications(group: arguments[valueIndex])
+    exit(0)
+}
+
 let application = NSApplication.shared
 let delegate = AppDelegate()
 application.delegate = delegate

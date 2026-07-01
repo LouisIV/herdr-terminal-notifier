@@ -7,6 +7,12 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BUILD_DIR="$ROOT/.build/herdr-notify"
 APP_SRC="$BUILD_DIR/Build/Products/Release/HerdrNotify.app"
 APP_DST="$ROOT/assets/HerdrNotify.app"
+APP_TMP="$ROOT/assets/.HerdrNotify.app.tmp.$$"
+
+cleanup() {
+  rm -rf "$APP_TMP"
+}
+trap cleanup EXIT
 
 if ! command -v tuist >/dev/null 2>&1; then
   echo "tuist not found on PATH; install Tuist to rebuild HerdrNotify.app" >&2
@@ -25,8 +31,15 @@ xcodebuild \
   CODE_SIGNING_REQUIRED=NO \
   build
 
+if [ ! -d "$APP_SRC" ]; then
+  echo "build product missing: $APP_SRC" >&2
+  exit 1
+fi
+
+rm -rf "$APP_TMP"
+cp -R "$APP_SRC" "$APP_TMP"
+codesign --force --deep -s - "$APP_TMP" >/dev/null
+
 rm -rf "$APP_DST"
-mkdir -p "$(dirname "$APP_DST")"
-cp -R "$APP_SRC" "$APP_DST"
-codesign --force --deep -s - "$APP_DST" >/dev/null 2>&1 || true
+mv "$APP_TMP" "$APP_DST"
 echo "built notifier: $APP_DST"

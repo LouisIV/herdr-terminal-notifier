@@ -1,6 +1,13 @@
-The previously bundled helper was based on terminal-notifier and is available under the MIT license below.
+HerdrNotify.app is the bundled macOS notification helper for this plugin. The
+current helper source lives under `Sources/HerdrNotify` and is distributed under
+this repository's MIT license.
 
-`Terminal.icns` in this repository is not Apple Terminal.app artwork. It is the herdr icon used so notifications are attributed to the HerdrNotify app identity.
+`Terminal.icns` in this repository is not Apple Terminal.app artwork. It is the
+herdr icon from this repository's assets, used so notifications are attributed to
+the HerdrNotify app identity.
+
+The previously bundled helper was based on terminal-notifier and is available
+under the MIT license below.
 
 Copyright (C) 2012-2016 Eloy Durán eloy.de.enige@gmail.com, Julien Blanchard julien@sideburns.eu
 

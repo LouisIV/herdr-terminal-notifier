@@ -5,7 +5,8 @@ changes — with a **custom herdr app icon**, templated messages, and click-to-j
 
 When an agent in any workspace becomes **blocked** (waiting for your input) or
 **done**, you get a native notification whose **left icon is the herdr logo**
-(not the generic terminal icon), and clicking it jumps straight to that pane.
+when the registered bundled app is used, and clicking it jumps straight to that
+pane.
 
 ```
 🐑  ⏳ claude needs input
@@ -26,6 +27,10 @@ So this plugin ships **`assets/HerdrNotify.app`** — a tiny source-built AppKit
 helper with the herdr icon and its own bundle id (`codes.dot.herdr-notify`). The
 plugin posts through it, so the notification is genuinely "from herdr" and shows
 the herdr logo. No Homebrew `terminal-notifier` needed at runtime.
+
+The app bundle is committed so normal plugin installs stay self-contained. The
+source and Tuist project are included so reviewers and users can rebuild that
+bundle locally.
 
 ## Requirements
 
@@ -115,7 +120,7 @@ Key settings:
 | `CLICK_COMMAND` | `agent focus {pane}` | `herdr` subcommand run on click |
 | `NOTIFIER` | _(bundled app)_ | absolute path to override the notifier binary |
 | `REGISTER_TTL_SECONDS` | `21600` | refresh Launch Services registration when older (self-heals left icon) |
-| `ICON_MODE` | `contentImage` | right-side image mode (`contentImage`/`appIcon`) |
+| `ICON_MODE` | `contentImage` | right-side image mode (`contentImage`; `appIcon` is passed only to custom `NOTIFIER` overrides that support it) |
 | `TITLE_<STATUS>` / `BODY_<STATUS>` | see example | message templates |
 | `ICON_<STATUS>` / `SOUND_<STATUS>` | see example | right-side image / macOS sound |
 
@@ -123,8 +128,8 @@ Template placeholders: `{agent}` `{workspace}` `{worktree}` `{tab}` `{pane}`
 `{session}` `{old_status}` `{new_status}` `{cwd}`. `<STATUS>` is the upper-cased
 status (`BLOCKED`, `DONE`, …); `*_DEFAULT` covers the rest.
 
-The **left** icon is always the herdr logo (the notifier app). `ICON_*` controls
-the optional **right-side** status image.
+With the registered bundled app, the **left** icon is the herdr logo. `ICON_*`
+controls the optional **right-side** status image.
 
 ## Customizing the herdr icon
 
@@ -139,9 +144,9 @@ bash scripts/setup-notifier.sh        # re-sign + re-register
 
 ## Building the notifier app
 
-The native helper source lives in `Sources/HerdrNotify` and the project is defined
-with Tuist in `Project.swift`. To rebuild the shipped app and use this checkout
-locally:
+The native helper source lives in `Sources/HerdrNotify` and the project is
+defined with Tuist in `Project.swift`. Rebuilding requires Tuist and Xcode with
+`xcodebuild` available. To rebuild the shipped app and use this checkout locally:
 
 ```sh
 brew install tuist
@@ -154,6 +159,11 @@ to `assets/HerdrNotify.app`, and ad-hoc signs it. `scripts/install.sh --link`
 links the checkout into herdr and runs `scripts/setup-notifier.sh` to register the
 app with Launch Services.
 
+Rebuilding intentionally replaces the committed `assets/HerdrNotify.app` bundle
+and can leave a git diff if your local toolchain emits different build metadata.
+Generated Tuist/Xcode files are ignored. To review the committed bundle against
+your rebuild, run `scripts/build-notifier.sh` and inspect `git diff`.
+
 ### Bundled binary audit
 
 The old bundled helper was an ad-hoc-signed, arm64-only `terminal-notifier`
@@ -161,7 +171,8 @@ binary built for macOS 26. Static inspection showed only Apple system framework
 dependencies and no entitlements, but the repository could not reproduce it from
 source. The Tuist source app replaces that opaque artifact with a reviewable
 implementation of the subset this plugin uses: title/message, group replacement,
-sound, content image, open URL, and click-to-focus command execution.
+sound, content image, and click-to-focus command execution. The helper also
+accepts `-open` for compatibility, though the plugin does not currently pass it.
 
 ## Cross-machine / declarative management (nix · chezmoi)
 

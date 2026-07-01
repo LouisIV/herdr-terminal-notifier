@@ -37,10 +37,12 @@ shell_quote() {
 # what makes the notification's LEFT icon the herdr logo instead of a terminal.
 BUNDLED_APP="$ROOT/assets/HerdrNotify.app"
 BUNDLED_BIN="$BUNDLED_APP/Contents/MacOS/terminal-notifier"
+USING_BUNDLED=0
 if [ -n "${NOTIFIER:-}" ] && [ -x "$NOTIFIER" ]; then
   NOTIFIER_BIN="$NOTIFIER"
 elif [ -x "$BUNDLED_BIN" ]; then
   NOTIFIER_BIN="$BUNDLED_BIN"
+  USING_BUNDLED=1
   # Keep the bundle registered with Launch Services so macOS attributes the
   # notification (and its LEFT icon) to HerdrNotify.app instead of falling back
   # to the parent terminal's icon (ghostty, Terminal, ...).
@@ -201,7 +203,13 @@ if [ -n "$icon" ]; then
   case "$icon" in /*) : ;; *) icon="$ROOT/$icon" ;; esac
   if [ -f "$icon" ]; then
     case "${ICON_MODE:-contentImage}" in
-      appIcon) args+=(-appIcon "$icon") ;;
+      appIcon)
+        if [ "$USING_BUNDLED" = 1 ]; then
+          args+=(-contentImage "$icon")
+        else
+          args+=(-appIcon "$icon")
+        fi
+        ;;
       *)       args+=(-contentImage "$icon") ;;
     esac
   fi
