@@ -14,20 +14,27 @@ set -euo pipefail
 PLUGIN_ID="dot.terminal-notifier"
 GITHUB_SLUG="dot/herdr-terminal-notifier"
 HERDR="${HERDR_BIN_PATH:-herdr}"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+mode="${1:---install}"
 
 if ! command -v "$HERDR" >/dev/null 2>&1; then
   echo "herdr not found on PATH; skipping plugin install" >&2
   exit 0
 fi
 
-if "$HERDR" plugin list 2>/dev/null | grep -q "$PLUGIN_ID"; then
+case "$mode" in
+  --install|--link) ;;
+  *)
+    echo "usage: scripts/install.sh [--install|--link [PATH]]" >&2
+    exit 2
+    ;;
+esac
+
+if [ "$mode" = "--install" ] && "$HERDR" plugin list 2>/dev/null | grep -Fq "$PLUGIN_ID"; then
   echo "$PLUGIN_ID already installed; nothing to do"
   exit 0
 fi
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-
-mode="${1:---install}"
 case "$mode" in
   --link)
     path="${2:-$ROOT}"

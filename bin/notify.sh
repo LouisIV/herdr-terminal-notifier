@@ -18,6 +18,19 @@ mkdir -p "$STATE_DIR"
 
 log() { printf '[terminal-notifier] %s\n' "$*" >&2; }
 
+if ! command -v jq >/dev/null 2>&1; then
+  log "jq is required; install it with 'brew install jq'"
+  exit 0
+fi
+
+is_uint() { case "${1:-}" in ''|*[!0-9]*) return 1 ;; *) return 0 ;; esac; }
+
+shell_quote() {
+  printf "'"
+  printf '%s' "$1" | sed "s/'/'\\\\''/g"
+  printf "'"
+}
+
 # --- 0. resolve the notifier binary -----------------------------------------
 # Prefer the bundled HerdrNotify.app (custom herdr icon + own bundle id), then
 # an explicit override, then a system terminal-notifier. The bundled app is
@@ -43,6 +56,7 @@ elif [ -x "$BUNDLED_BIN" ]; then
   sentinel="$STATE_DIR/.notifier-registered"
   lsregister="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
   register_ttl="${REGISTER_TTL_SECONDS:-21600}" # 6h; bounds how long a stale reg can linger
+  is_uint "$register_ttl" || register_ttl=21600
   needs_register=0 needs_codesign=0
   if [ ! -f "$sentinel" ] || [ "$BUNDLED_BIN" -nt "$sentinel" ]; then
     needs_register=1 needs_codesign=1
@@ -52,8 +66,11 @@ elif [ -x "$BUNDLED_BIN" ]; then
   fi
   if [ "$needs_register" = 1 ]; then
     [ "$needs_codesign" = 1 ] && { codesign --force --deep -s - "$BUNDLED_APP" >/dev/null 2>&1 || true; }
-    "$lsregister" -f "$BUNDLED_APP" >/dev/null 2>&1 || true
-    : >"$sentinel"
+    if [ -x "$lsregister" ] && "$lsregister" -f "$BUNDLED_APP" >/dev/null 2>&1; then
+      : >"$sentinel"
+    else
+      log "failed to register bundled notifier with Launch Services"
+    fi
   fi
 elif command -v terminal-notifier >/dev/null 2>&1; then
   NOTIFIER_BIN="terminal-notifier"
@@ -137,9 +154,12 @@ fi
 if [ -n "$pane_id" ]; then
   stamp_file="$STATE_DIR/debounce-$pane_key"
   now="$(date +%s)"
+  debounce_seconds="${DEBOUNCE_SECONDS:-0}"
+  is_uint "$debounce_seconds" || debounce_seconds=0
   if [ -f "$stamp_file" ]; then
     read -r last_ts last_status <"$stamp_file" || true
-    if [ "$last_status" = "$new_status" ] && [ $((now - ${last_ts:-0})) -lt "${DEBOUNCE_SECONDS:-0}" ]; then
+    is_uint "${last_ts:-}" || last_ts=0
+    if [ "$last_status" = "$new_status" ] && [ $((now - last_ts)) -lt "$debounce_seconds" ]; then
       exit 0
     fi
   fi
@@ -189,10 +209,13 @@ fi
 
 if [ "${ACTIVATE_ON_CLICK:-0}" = "1" ] && [ -n "$pane_id" ]; then
   bin="$(command -v "$HERDR_BIN" || printf '%s' "$HERDR_BIN")"
-  click="${CLICK_COMMAND//\{pane\}/$pane_id}"
-  click="${click//\{workspace\}/$workspace_id}"
-  click="${click//\{agent\}/$agent}"
-  args+=(-execute "$bin $click")
+  quoted_pane="$(shell_quote "$pane_id")"
+  quoted_workspace="$(shell_quote "$workspace_id")"
+  quoted_agent="$(shell_quote "$agent")"
+  click="${CLICK_COMMAND//\{pane\}/$quoted_pane}"
+  click="${click//\{workspace\}/$quoted_workspace}"
+  click="${click//\{agent\}/$quoted_agent}"
+  args+=(-execute "$(shell_quote "$bin") $click")
 fi
 
 "$NOTIFIER_BIN" "${args[@]}" >/dev/null 2>&1 || log "notifier failed"

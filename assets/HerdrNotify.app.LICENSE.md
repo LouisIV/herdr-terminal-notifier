@@ -1,4 +1,6 @@
-All the works are available under the MIT license. Except for ‘Terminal.icns’, which is a copy of Apple’s Terminal.app icon and as such is copyright of Apple.
+The previously bundled helper was based on terminal-notifier and is available under the MIT license below.
+
+`Terminal.icns` in this repository is not Apple Terminal.app artwork. It is the herdr icon used so notifications are attributed to the HerdrNotify app identity.
 
 Copyright (C) 2012-2016 Eloy Durán eloy.de.enige@gmail.com, Julien Blanchard julien@sideburns.eu
 

@@ -22,14 +22,14 @@ The usual tricks don't help on modern macOS:
 - `osascript -e 'display notification …'` always shows the **Script Editor** icon and
   supports no icon/sound/click customization at all.
 
-So this plugin ships **`assets/HerdrNotify.app`** — a copy of `terminal-notifier`
-rebranded with the herdr icon and its own bundle id (`codes.dot.herdr-notify`). The
+So this plugin ships **`assets/HerdrNotify.app`** — a tiny source-built AppKit
+helper with the herdr icon and its own bundle id (`codes.dot.herdr-notify`). The
 plugin posts through it, so the notification is genuinely "from herdr" and shows
 the herdr logo. No Homebrew `terminal-notifier` needed at runtime.
 
 ## Requirements
 
-- macOS (tested on macOS 26).
+- macOS (tested on macOS 26; the source helper targets macOS 13+).
 - `jq` — the only runtime dependency. Declare it in your `homebrew.nix` / `Brewfile`:
 
   ```sh
@@ -101,6 +101,9 @@ and point at it from your shell profile:
 export HERDR_TN_CONFIG="$HOME/.config/herdr-terminal-notifier/config.env"
 ```
 
+Config files are sourced as shell so quoted strings and variable expansion work.
+Only use config files you control.
+
 Key settings:
 
 | Key | Default | Meaning |
@@ -134,6 +137,32 @@ sips -s format icns your.png --out assets/HerdrNotify.app/Contents/Resources/Ter
 bash scripts/setup-notifier.sh        # re-sign + re-register
 ```
 
+## Building the notifier app
+
+The native helper source lives in `Sources/HerdrNotify` and the project is defined
+with Tuist in `Project.swift`. To rebuild the shipped app and use this checkout
+locally:
+
+```sh
+brew install tuist
+scripts/build-notifier.sh
+scripts/install.sh --link
+```
+
+The script runs `tuist generate`, builds the Release `HerdrNotify` app, copies it
+to `assets/HerdrNotify.app`, and ad-hoc signs it. `scripts/install.sh --link`
+links the checkout into herdr and runs `scripts/setup-notifier.sh` to register the
+app with Launch Services.
+
+### Bundled binary audit
+
+The old bundled helper was an ad-hoc-signed, arm64-only `terminal-notifier`
+binary built for macOS 26. Static inspection showed only Apple system framework
+dependencies and no entitlements, but the repository could not reproduce it from
+source. The Tuist source app replaces that opaque artifact with a reviewable
+implementation of the subset this plugin uses: title/message, group replacement,
+sound, content image, open URL, and click-to-focus command execution.
+
 ## Cross-machine / declarative management (nix · chezmoi)
 
 - **Self-contained**: the notifier app is bundled, so the only external dep is `jq`.
@@ -148,8 +177,9 @@ bash scripts/setup-notifier.sh        # re-sign + re-register
 - `SOUND_*` uses **macOS system sound names** (`Glass`, `Hero`, `Ping`, …).
 - Set `DEBUG=1` to dump the raw event/context JSON to
   `$HERDR_PLUGIN_STATE_DIR/last-event.json` (handy after a herdr upgrade).
-- The bundled notifier is a copy of [`terminal-notifier`](https://github.com/julienXX/terminal-notifier)
-  (MIT, see `assets/HerdrNotify.app.LICENSE.md`).
+- The bundled notifier is source-built for this plugin. The historical
+  terminal-notifier license is retained in `assets/HerdrNotify.app.LICENSE.md`
+  for provenance of older bundled artifacts.
 
 ## Ideas / roadmap (not yet implemented)
 

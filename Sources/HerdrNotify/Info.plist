@@ -2,10 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>BuildMachineOSBuild</key>
-	<string>25F80</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
 	<string>herdr</string>
 	<key>CFBundleExecutable</key>
@@ -13,7 +11,7 @@
 	<key>CFBundleIconFile</key>
 	<string>Terminal</string>
 	<key>CFBundleIdentifier</key>
-	<string>codes.dot.herdr-notify</string>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleInfoDictionaryVersion</key>
 	<string>6.0</string>
 	<key>CFBundleName</key>
@@ -22,32 +20,12 @@
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>
 	<string>0.2.0</string>
-	<key>CFBundleSupportedPlatforms</key>
-	<array>
-		<string>MacOSX</string>
-	</array>
 	<key>CFBundleVersion</key>
 	<string>2</string>
-	<key>DTCompiler</key>
-	<string>com.apple.compilers.llvm.clang.1_0</string>
-	<key>DTPlatformBuild</key>
-	<string>25F70</string>
-	<key>DTPlatformName</key>
-	<string>macosx</string>
-	<key>DTPlatformVersion</key>
-	<string>26.5</string>
-	<key>DTSDKBuild</key>
-	<string>25F70</string>
-	<key>DTSDKName</key>
-	<string>macosx26.5</string>
-	<key>DTXcode</key>
-	<string>2660</string>
-	<key>DTXcodeBuild</key>
-	<string>17F113</string>
 	<key>LSApplicationCategoryType</key>
 	<string>public.app-category.utilities</string>
 	<key>LSMinimumSystemVersion</key>
-	<string>13.0</string>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
 	<key>LSUIElement</key>
 	<true/>
 	<key>NSHumanReadableCopyright</key>

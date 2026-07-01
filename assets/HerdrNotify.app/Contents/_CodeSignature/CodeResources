@@ -26,15 +26,6 @@
 			<key>optional</key>
 			<true/>
 		</dict>
-		<key>Resources/en.lproj/MainMenu.nib</key>
-		<dict>
-			<key>hash</key>
-			<data>
-			ks63ht6nCtcvf9VjUbrnRAck+t8=
-			</data>
-			<key>optional</key>
-			<true/>
-		</dict>
 	</dict>
 	<key>files2</key>
 	<dict>
@@ -59,15 +50,6 @@
 			<key>hash2</key>
 			<data>
 			Oc8u4Ht7Mz58F50L9NeYpbcq9qTlhPUeZCcDu/pPyCg=
-			</data>
-			<key>optional</key>
-			<true/>
-		</dict>
-		<key>Resources/en.lproj/MainMenu.nib</key>
-		<dict>
-			<key>hash2</key>
-			<data>
-			T28xZ3pEIF+z1AwdptRqPpSBbjWA+HVFDrMmTQ6sosQ=
 			</data>
 			<key>optional</key>
 			<true/>
